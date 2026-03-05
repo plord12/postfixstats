@@ -141,7 +141,7 @@ func main() {
 			}
 			forwardMatches := forwardRegex.FindStringSubmatch(scanner.Text())
 			if len(forwardMatches) > 0 {
-				//fmt.Fprintf(os.Stderr, "forward date=%s id=%s oldid=%s\n", forwardMatches[1], forwardMatches[2], forwardMatches[3])
+				// fmt.Fprintf(os.Stderr, "forward date=%s id=%s oldid=%s\n", forwardMatches[1], forwardMatches[2], forwardMatches[3])
 				forwardMap[forwardMatches[3]] = forwardMatches[2]
 				continue
 			}
@@ -162,14 +162,28 @@ func main() {
 			continue
 		}
 
-		if len(forwardMap[k]) > 0 {
-			key, ok := successMap[forwardMap[k]]
-			if ok {
-				//fmt.Fprintf(os.Stderr, "    was successfully sent %v %v\n", key, failedReport[key])
-				failedReport[key]--
-				resentReport[key]++
-				continue
+		forwardingId := k
+		forwarded := false
+		for {
+			if len(forwardingId) > 0 {
+				// fmt.Fprintf(os.Stderr, "Got %v %v\n", forwardingId, successMap[forwardMap[forwardingId]])
+				key, ok := successMap[forwardMap[forwardingId]]
+				if ok {
+					// fmt.Fprintf(os.Stderr, "Was successfully sent %v %v\n", key, failedReport[key])
+					failedReport[key]--
+					resentReport[key]++
+
+					forwarded = true
+					break
+				} else {
+					forwardingId = forwardMap[forwardingId]
+				}
+			} else {
+				break
 			}
+		}
+		if forwarded {
+			continue
 		}
 
 		fmt.Fprintf(os.Stderr, "failed %s %v\n", k, failedMap[k])
