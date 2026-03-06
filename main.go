@@ -15,8 +15,9 @@ import (
 )
 
 type Options struct {
-	StartDate string `short:"s" long:"startdate" description:"Start date (YYYY-MM-DD)" default:"2000-01-01" env:"STARTDATE"`
-	EndDate   string `short:"a" long:"enddate" description:"End date (YYYY-MM-DD)" default:"2050-01-01" env:"ENDDATE"`
+	StartDate string   `short:"s" long:"startdate" description:"Start date (YYYY-MM-DD)" default:"2000-01-01" env:"STARTDATE"`
+	EndDate   string   `short:"e" long:"enddate" description:"End date (YYYY-MM-DD)" default:"2050-01-01" env:"ENDDATE"`
+	Domains   []string `short:"d" long:"domain" description:"List of domains to report on" env:"DOMAINS"`
 }
 
 var cliOptions Options
@@ -24,7 +25,7 @@ var parser = flags.NewParser(&cliOptions, flags.Default)
 
 func main() {
 
-	// parse flags
+	// Parse flags
 	//
 	args, err := parser.Parse()
 	if err != nil {
@@ -61,25 +62,27 @@ func main() {
 	toRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/[sl]mtp\\[[0-9]*\\]: ([0-9A-F]*): to=<([^>]*)>.+status=([^ ]*) ")
 
 	// date $2 - new id $3 = from $4 = old id
-	forwardRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/pickup\\[[0-9]*\\]: ([0-9A-F]*): uid=[^ ]* from=[^ ]* orig_id=([0-9A-F]*)")
+	requeueRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/pickup\\[[0-9]*\\]: ([0-9A-F]*): uid=[^ ]* from=[^ ]* orig_id=([0-9A-F]*)")
 
 	type Key struct {
 		Date, From string
 	}
 
-	// temp store to correlate lines
-	//-
+	// Temp store to correlate lines
+	//
 	fromMap := make(map[string]string)
-	forwardMap := make(map[string]string)
+	requeueMap := make(map[string]string)
 	failedMap := make(map[string]Key)
 	successMap := make(map[string]Key)
 
-	// reports
+	// Reports
 	//
 	sentReport := make(map[Key]int)
 	failedReport := make(map[Key]int)
 	resentReport := make(map[Key]int)
 
+	// Loop through supplied log filenames
+	//
 	for _, filename := range args {
 		file, err := os.Open(filename)
 		if err != nil {
@@ -89,6 +92,8 @@ func main() {
 
 		var scanner *bufio.Scanner
 		if strings.HasSuffix(filename, ".gz") {
+			// GZ file
+			//
 			gr, err := gzip.NewReader(file)
 			if err != nil {
 				log.Fatal(err)
@@ -96,14 +101,17 @@ func main() {
 			defer gr.Close()
 			scanner = bufio.NewScanner(gr)
 		} else {
+			// Plain file
+			//
 			scanner = bufio.NewScanner(file)
 		}
 
 		for scanner.Scan() {
 
+			// Record id vs from address
+			//
 			fromMatches := fromRegex.FindStringSubmatch(scanner.Text())
 			if len(fromMatches) > 0 {
-				//fmt.Fprintf(os.Stderr, "from date=%s id=%s from=%s\n", fromMatches[1], fromMatches[2], fromMatches[3])
 				if len(fromMatches[3]) == 0 {
 					fromMap[fromMatches[2]] = "unknown"
 				} else {
@@ -111,10 +119,19 @@ func main() {
 				}
 				continue
 			}
+
+			// Process delivery
+			//
 			toMatches := toRegex.FindStringSubmatch(scanner.Text())
 			if len(toMatches) > 0 {
-				from := fromMap[toMatches[2]]
-				if len(from) > 0 {
+
+				// Only process if we found a previous from address for this id
+				//
+				from, ok := fromMap[toMatches[2]]
+				if ok {
+
+					// Skip if outside time range
+					//
 					timestamp, err := time.Parse(time.DateOnly, toMatches[1])
 					if err != nil {
 						panic(fmt.Sprintf("could not parse timestamp: %v", err))
@@ -122,12 +139,17 @@ func main() {
 					if timestamp.Before(startDate) || timestamp.After(endDate) {
 						continue
 					}
-					//fmt.Fprintf(os.Stderr, "to date=%s id=%s to=%s status=%s from=%s\n", toMatches[1], toMatches[2], toMatches[3], toMatches[4], from)
+
 					if toMatches[4] == "sent" {
+
+						// Record success
+						//
 						sentReport[Key{toMatches[1], from}]++
 						successMap[toMatches[2]] = Key{toMatches[1], from}
 					} else {
-						// make sure we don't record re-tries as multiple failures
+
+						// Record failure, but make sure we don't record retries as multiple failures
+						//
 						_, ok := failedMap[toMatches[2]]
 						if !ok {
 							failedReport[Key{toMatches[1], from}]++
@@ -139,10 +161,12 @@ func main() {
 				}
 				continue
 			}
-			forwardMatches := forwardRegex.FindStringSubmatch(scanner.Text())
-			if len(forwardMatches) > 0 {
-				// fmt.Fprintf(os.Stderr, "forward date=%s id=%s oldid=%s\n", forwardMatches[1], forwardMatches[2], forwardMatches[3])
-				forwardMap[forwardMatches[3]] = forwardMatches[2]
+
+			// Record that an email has been re-queued (has a new id)
+			//
+			requeueMatches := requeueRegex.FindStringSubmatch(scanner.Text())
+			if len(requeueMatches) > 0 {
+				requeueMap[requeueMatches[3]] = requeueMatches[2]
 				continue
 			}
 		}
@@ -152,12 +176,13 @@ func main() {
 		}
 	}
 
-	// check to see if a failure was later re-sent
+	// Check to see if a failure was later resent
 	//
 	for k := range failedMap {
 		_, ok := successMap[k]
 		if ok {
-			//fmt.Fprintf(os.Stderr, "  later succeeded\n")
+			// Normal retry and now success
+			//
 			failedReport[failedMap[k]]--
 			continue
 		}
@@ -165,28 +190,28 @@ func main() {
 		forwardingId := k
 		forwarded := false
 		for {
-			if len(forwardingId) > 0 {
-				// fmt.Fprintf(os.Stderr, "Got %v %v\n", forwardingId, successMap[forwardMap[forwardingId]])
-				key, ok := successMap[forwardMap[forwardingId]]
-				if ok {
-					// fmt.Fprintf(os.Stderr, "Was successfully sent %v %v\n", key, failedReport[key])
-					failedReport[key]--
-					resentReport[key]++
-
-					forwarded = true
-					break
-				} else {
-					forwardingId = forwardMap[forwardingId]
-				}
-			} else {
+			// can have more than one new id, so keep following requeue map until blank
+			//
+			key, ok := successMap[requeueMap[forwardingId]]
+			if ok {
+				failedReport[key]--
+				resentReport[key]++
+				forwarded = true
 				break
+			} else {
+				forwardingId, ok = requeueMap[forwardingId]
+				if !ok {
+					break
+				}
 			}
 		}
 		if forwarded {
 			continue
 		}
 
-		fmt.Fprintf(os.Stderr, "failed %s %v\n", k, failedMap[k])
+		// debug for manual checking logs
+		//
+		fmt.Fprintf(os.Stderr, "Message failed delivery %s %v\n", k, failedMap[k])
 	}
 
 	// generate reports
@@ -205,14 +230,14 @@ func main() {
 	sort.Slice(failedKeys, func(i, j int) bool {
 		return failedKeys[i].Date < failedKeys[j].Date
 	})
-	for _, domain := range []string{"u3acommunities.org", "u3a.social", "plord.co.uk"} {
+	for _, domain := range cliOptions.Domains {
 		total := 0
-		fmt.Printf("Domain %s success\n\n", domain)
+		fmt.Printf("Domain %s success:\n\n", domain)
 		for _, sent := range sentKeys {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if sentReport[sent] > 0 {
 					if resentReport[sent] > 0 {
-						fmt.Printf("%s %s %d (%d via smtp2go)\n", sent.Date, sent.From, sentReport[sent], resentReport[sent])
+						fmt.Printf("%s %s %d (%d success after requeue)\n", sent.Date, sent.From, sentReport[sent], resentReport[sent])
 					} else {
 						fmt.Printf("%s %s %d\n", sent.Date, sent.From, sentReport[sent])
 					}
@@ -220,10 +245,13 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("\nTotal success for domain %s %d\n\n", domain, total)
+		if total > 0 {
+			fmt.Printf("\n")
+		}
+		fmt.Printf("Total success for domain %s %d\n\n", domain, total)
 
 		total = 0
-		fmt.Printf("Domain %s failure\n\n", domain)
+		fmt.Printf("Domain %s failure:\n\n", domain)
 		for _, sent := range failedKeys {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if failedReport[sent] > 0 {
@@ -232,6 +260,9 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("\nTotal failure for domain %s %d\n\n", domain, total)
+		if total > 0 {
+			fmt.Printf("\n")
+		}
+		fmt.Printf("Total failure for domain %s %d\n\n", domain, total)
 	}
 }
