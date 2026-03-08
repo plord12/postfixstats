@@ -87,6 +87,8 @@ func main() {
 	// date $2 - id $3 = from $4 = to
 	inboundRejectRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/cleanup\\[[0-9]*\\]: ([0-9A-F]*): milter-reject: .+ from=<([^>]*)> to=<([^>]*)>")
 
+	srsRegex, _ := regexp.Compile("^SRS0=[^=]*=[^=]*=([^=]*)=([^@]*)@")
+
 	type Key struct {
 		Date, From string
 	}
@@ -141,7 +143,12 @@ func main() {
 				if len(fromMatches[3]) == 0 {
 					outboundFromMap[fromMatches[2]] = "unknown"
 				} else {
-					outboundFromMap[fromMatches[2]] = fromMatches[3]
+					deSrs := srsRegex.FindStringSubmatch(fromMatches[3])
+					if len(deSrs) > 0 {
+						outboundFromMap[fromMatches[2]] = deSrs[2] + "@" + deSrs[1]
+					} else {
+						outboundFromMap[fromMatches[2]] = fromMatches[3]
+					}
 				}
 				continue
 			}
