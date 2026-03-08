@@ -33,7 +33,8 @@ ${BINDIR}/${NAME}-windows.exe: ${SOURCES}
 	GOARCH=amd64 GOOS=windows go build -o $@ $^
 
 test: ${BINDIR}/${NAME}
-	${BINDIR}/${NAME} --domain u3acommunities.org --domain u3a.social --startdate=2026-02-01 testdata/mail*
+	${BINDIR}/${NAME} --domain u3acommunities.org --domain u3a.social --startdate=2026-03-01 testdata/mail*
+	${BINDIR}/${NAME} --html --domain u3acommunities.org --domain u3a.social --startdate=2026-03-01 testdata/mail*
 
 clean:
 	@go clean
