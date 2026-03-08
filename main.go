@@ -339,7 +339,7 @@ func main() {
 	for _, domain := range cliOptions.Domains {
 		total := 0
 		if cliOptions.Html {
-			fmt.Printf("<h2>Domain outbound %s success:</h2>\n<table><thead><tr><td><b>Date</b></td><td><b>Address</b></td><td><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
+			fmt.Printf("<h2>Domain outbound %s success:</h2>\n<table style=\"border: 1px solid;\"><thead><tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Date</b></td><td style=\"border: 1px solid;\"><b>Address</b></td><td style=\"border: 1px solid;\"><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
 		} else {
 			fmt.Printf("Domain outbound %s success:\n\n", domain)
 		}
@@ -348,13 +348,13 @@ func main() {
 				if outboundSentReport[sent] > 0 {
 					if outboundResentReport[sent] > 0 {
 						if cliOptions.Html {
-							fmt.Printf("<tr><td>%s</td><td>%s</td><td>%d (%d success after requeue)</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent])
+							fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d (%d success after requeue)</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent])
 						} else {
 							fmt.Printf("%s %s %d (%d success after requeue)\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent])
 						}
 					} else {
 						if cliOptions.Html {
-							fmt.Printf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent])
+							fmt.Printf("<tr><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent])
 						} else {
 							fmt.Printf("%s %s %d\n", sent.Date, sent.From, outboundSentReport[sent])
 						}
@@ -369,14 +369,14 @@ func main() {
 			}
 		}
 		if cliOptions.Html {
-			fmt.Printf("<tr><td><b>Total</b></td><td></td><td><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
+			fmt.Printf("<tr><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
 		} else {
 			fmt.Printf("Total outbound success for domain %s %d\n\n", domain, total)
 		}
 
 		total = 0
 		if cliOptions.Html {
-			fmt.Printf("<h2>Domain outbound %s failure:</h2>\n<table><thead><tr><td><b>Date</b></td><td><b>Address</b></td><td><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
+			fmt.Printf("<h2>Domain outbound %s failure:</h2>\n<table style=\"border: 1px solid;\"><thead><tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Date</b></td><td style=\"border: 1px solid;\"><b>Address</b></td><td style=\"border: 1px solid;\"><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
 		} else {
 			fmt.Printf("Domain outbound %s failure:\n\n", domain)
 		}
@@ -384,7 +384,7 @@ func main() {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if outboundFailedReport[sent] > 0 {
 					if cliOptions.Html {
-						fmt.Printf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>\n", sent.Date, sent.From, outboundFailedReport[sent])
+						fmt.Printf("<tr><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d</td></tr>\n", sent.Date, sent.From, outboundFailedReport[sent])
 					} else {
 						fmt.Printf("%s %s %d\n", sent.Date, sent.From, outboundFailedReport[sent])
 					}
@@ -398,14 +398,14 @@ func main() {
 			}
 		}
 		if cliOptions.Html {
-			fmt.Printf("<tr><td><b>Total</b></td><td></td><td><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
+			fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
 		} else {
 			fmt.Printf("Total outbound failure for domain %s %d\n\n", domain, total)
 		}
 
 		total = 0
 		if cliOptions.Html {
-			fmt.Printf("<h2>Domain inbound %s success:</h2>\n<table><thead><tr><td><b>Date</b></td><td><b>Address</b></td><td><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
+			fmt.Printf("<h2>Domain inbound %s success:</h2>\n<table style=\"border: 1px solid;\"><thead><tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Date</b></td><td style=\"border: 1px solid;\"><b>Address</b></td><td style=\"border: 1px solid;\"><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
 		} else {
 			fmt.Printf("Domain inbound %s success:\n\n", domain)
 		}
@@ -413,7 +413,7 @@ func main() {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if inboundSentReport[sent] > 0 {
 					if cliOptions.Html {
-						fmt.Printf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>\n", sent.Date, sent.From, inboundSentReport[sent])
+						fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d</td></tr>\n", sent.Date, sent.From, inboundSentReport[sent])
 					} else {
 						fmt.Printf("%s %s %d\n", sent.Date, sent.From, inboundSentReport[sent])
 					}
@@ -427,14 +427,14 @@ func main() {
 			}
 		}
 		if cliOptions.Html {
-			fmt.Printf("<tr><td><b>Total</b></td><td></td><td><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
+			fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
 		} else {
 			fmt.Printf("Total inbound success for domain %s %d\n\n", domain, total)
 		}
 
 		total = 0
 		if cliOptions.Html {
-			fmt.Printf("<h2>Domain inbound %s failure (rejected by rspamd):</h2>\n<table><thead><tr><td><b>Date</b></td><td><b>Address</b></td><td><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
+			fmt.Printf("<h2>Domain inbound %s failure (rejected by rspamd):</h2>\n<table style=\"border: 1px solid;\"><thead><tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Date</b></td><td style=\"border: 1px solid;\"><b>Address</b></td><td style=\"border: 1px solid;\"><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
 		} else {
 			fmt.Printf("Domain inbound %s failure (rejected by rspamd):\n\n", domain)
 		}
@@ -442,7 +442,7 @@ func main() {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if inboundFailedReport[sent] > 0 {
 					if cliOptions.Html {
-						fmt.Printf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>\n", sent.Date, sent.From, inboundFailedReport[sent])
+						fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d</td></tr>\n", sent.Date, sent.From, inboundFailedReport[sent])
 					} else {
 						fmt.Printf("%s %s %d\n", sent.Date, sent.From, inboundFailedReport[sent])
 					}
@@ -456,7 +456,7 @@ func main() {
 			}
 		}
 		if cliOptions.Html {
-			fmt.Printf("<tr><td><b>Total</b></td><td></td><td><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
+			fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
 		} else {
 			fmt.Printf("Total inbound failure for domain %s %d\n\n", domain, total)
 		}
