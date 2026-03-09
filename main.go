@@ -338,6 +338,7 @@ func main() {
 	}
 	for _, domain := range cliOptions.Domains {
 		total := 0
+		totalResent := 0
 		if cliOptions.Html {
 			fmt.Printf("<h2>Domain outbound %s success:</h2>\n<table style=\"border: 1px solid;\"><thead><tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\"><b>Date</b></td><td style=\"border: 1px solid;\"><b>Address</b></td><td style=\"border: 1px solid;\"><b>Count</b></td></tr></thead>\n<tbody>\n", domain)
 		} else {
@@ -347,10 +348,11 @@ func main() {
 			if strings.HasSuffix(sent.From, "@"+domain) {
 				if outboundSentReport[sent] > 0 {
 					if outboundResentReport[sent] > 0 {
+						percentRetries := float64(100) * (float64(outboundResentReport[sent]) / float64(outboundSentReport[sent]))
 						if cliOptions.Html {
-							fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d (%d success after requeue)</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent])
+							fmt.Printf("<tr style=\"border: 1px solid;\"><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%s</td><td style=\"border: 1px solid;\">%d (%d, or %0.2f%%, success after requeue)</td></tr>\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent], percentRetries)
 						} else {
-							fmt.Printf("%s %s %d (%d success after requeue)\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent])
+							fmt.Printf("%s %s %d (%d, or %0.2f%%, success after requeue)\n", sent.Date, sent.From, outboundSentReport[sent], outboundResentReport[sent], percentRetries)
 						}
 					} else {
 						if cliOptions.Html {
@@ -360,6 +362,7 @@ func main() {
 						}
 					}
 					total = total + outboundSentReport[sent]
+					totalResent = totalResent + outboundResentReport[sent]
 				}
 			}
 		}
@@ -368,10 +371,11 @@ func main() {
 				fmt.Printf("\n")
 			}
 		}
+		percentRetries := float64(100) * (float64(totalResent) / float64(total))
 		if cliOptions.Html {
-			fmt.Printf("<tr><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d</b></td></tr>\n</tbody>\n</table>\n", total)
+			fmt.Printf("<tr><td style=\"border: 1px solid;\"><b>Total</b></td><td style=\"border: 1px solid;\"></td><td style=\"border: 1px solid;\"><b>%d (%d, or %0.2f%%, success after requeue)</b></td></tr>\n</tbody>\n</table>\n", total, totalResent, percentRetries)
 		} else {
-			fmt.Printf("Total outbound success for domain %s %d\n\n", domain, total)
+			fmt.Printf("Total outbound success for domain %s %d (%d, or %0.2f%%, success after requeue)\n\n", domain, total, totalResent, percentRetries)
 		}
 
 		total = 0
