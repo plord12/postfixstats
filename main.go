@@ -19,6 +19,7 @@ type Options struct {
 	EndDate   string   `short:"e" long:"enddate" description:"End date (YYYY-MM-DD)" default:"2050-01-01" env:"ENDDATE"`
 	Domains   []string `short:"d" long:"domain" description:"List of domains to report on" env:"DOMAINS"`
 	Html      bool     `short:"w" long:"html" description:"HTML output" env:"HTML"`
+	Verbose   bool     `short:"v" long:"verbose" description:"Add verbose output to stderr" env:"VERBOSE"`
 }
 
 var cliOptions Options
@@ -69,20 +70,20 @@ func main() {
 
 	// Outbound
 	//
-	// date $2 - id $3 = from
-	outboundFromRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/qmgr\\[[0-9]*\\]: ([0-9A-F]*): from=<([^>]*)>")
-	// date $2 - id $3 = from $4 = status
-	outboundToRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/smtp\\[[0-9]*\\]: ([0-9A-F]*): to=<([^>]*)>.+status=([^ ]*) ")
+	// date $1, time $2, id $3, from $4
+	outboundFromRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})[^ ]* mail postfix/qmgr\\[[0-9]*\\]: ([0-9A-F]*): from=<([^>]*)>")
+	// date $1, time $2, id $3, to $4, status $5
+	outboundToRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})[^ ]* mail postfix/smtp\\[[0-9]*\\]: ([0-9A-F]*): to=<([^>]*)>.+status=([^ ]*) ")
 
-	// date $2 - new id $3 = from $4 = old id
-	requeueRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/pickup\\[[0-9]*\\]: ([0-9A-F]*): uid=[^ ]* from=[^ ]* orig_id=([0-9A-F]*)")
+	// date $1, time $2, id $3, original id $4
+	requeueRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})[^ ]* mail postfix/pickup\\[[0-9]*\\]: ([0-9A-F]*): uid=[^ ]* from=[^ ]* orig_id=([0-9A-F]*)")
 
 	// Inbound
 	//
-	// date $2 - id $3 = from $4 = status
-	inboundToRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/lmtp\\[[0-9]*\\]: ([0-9A-F]*): to=<([^>]*)>.+status=([^ ]*) ")
-	// date $2 - id $3 = from $4 = to
-	inboundRejectRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})[^ ]* mail postfix/cleanup\\[[0-9]*\\]: ([0-9A-F]*): milter-reject: .+ Spam message rejected; from=<([^>]*)> to=<([^>]*)>")
+	// date $1, time $2, id $3, to $4, status $5
+	inboundToRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})[^ ]* mail postfix/lmtp\\[[0-9]*\\]: ([0-9A-F]*): to=<([^>]*)>.+status=([^ ]*) ")
+	// date $1, time $2, id $3, from $4, to $5
+	inboundRejectRegex, _ := regexp.Compile("^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2})[^ ]* mail postfix/cleanup\\[[0-9]*\\]: ([0-9A-F]*): milter-reject: .+ Spam message rejected; from=<([^>]*)> to=<([^>]*)>")
 
 	srsRegex, _ := regexp.Compile("^SRS0=[^=]*=[^=]*=([^=]*)=([^@]*)@")
 
@@ -137,14 +138,19 @@ func main() {
 			//
 			fromMatches := outboundFromRegex.FindStringSubmatch(scanner.Text())
 			if len(fromMatches) > 0 {
-				if len(fromMatches[3]) == 0 {
-					outboundFromMap[fromMatches[2]] = "unknown"
+
+				// date $1, time $2, id $3, from $4
+				outboundFromId := fromMatches[3]
+				outboundFromFrom := fromMatches[4]
+
+				if len(outboundFromFrom) == 0 {
+					outboundFromMap[outboundFromId] = "unknown"
 				} else {
-					deSrs := srsRegex.FindStringSubmatch(fromMatches[3])
+					deSrs := srsRegex.FindStringSubmatch(outboundFromFrom)
 					if len(deSrs) > 0 {
-						outboundFromMap[fromMatches[2]] = deSrs[2] + "@" + deSrs[1]
+						outboundFromMap[outboundFromId] = deSrs[2] + "@" + deSrs[1]
 					} else {
-						outboundFromMap[fromMatches[2]] = fromMatches[3]
+						outboundFromMap[outboundFromId] = outboundFromFrom
 					}
 				}
 				continue
@@ -155,14 +161,21 @@ func main() {
 			outboundToMatches := outboundToRegex.FindStringSubmatch(scanner.Text())
 			if len(outboundToMatches) > 0 {
 
+				// date $1, time $2, id $3, to $4, status $5
+				outboundToDate := outboundToMatches[1]
+				outboundToTime := outboundToMatches[2]
+				outboundToId := outboundToMatches[3]
+				outboundToTo := outboundToMatches[4]
+				outboundToStatus := outboundToMatches[5]
+
 				// Only process if we found a previous from address for this id
 				//
-				from, ok := outboundFromMap[outboundToMatches[2]]
+				from, ok := outboundFromMap[outboundToId]
 				if ok {
 
 					// Skip if outside time range
 					//
-					timestamp, err := time.Parse(time.DateOnly, outboundToMatches[1])
+					timestamp, err := time.Parse(time.DateOnly, outboundToDate)
 					if err != nil {
 						panic(fmt.Sprintf("could not parse timestamp: %v", err))
 					}
@@ -170,20 +183,28 @@ func main() {
 						continue
 					}
 
-					if outboundToMatches[4] == "sent" {
+					if outboundToStatus == "sent" {
 
 						// Record success
 						//
-						outboundSentReport[Key{outboundToMatches[1], from}]++
-						outboundSuccessMap[outboundToMatches[2]] = Key{outboundToMatches[1], from}
+						outboundSentReport[Key{outboundToDate, from}]++
+						outboundSuccessMap[outboundToId] = Key{outboundToDate, from}
+
+						if cliOptions.Verbose {
+							fmt.Fprintf(os.Stderr, "%s %s outbound success %s -> %s\n", outboundToDate, outboundToTime, from, outboundToTo)
+						}
 					} else {
 
 						// Record failure, but make sure we don't record retries as multiple failures
 						//
-						_, ok := outboundFailedMap[outboundToMatches[2]]
+						_, ok := outboundFailedMap[outboundToId]
 						if !ok {
-							outboundFailedReport[Key{outboundToMatches[1], from}]++
-							outboundFailedMap[outboundToMatches[2]] = Key{outboundToMatches[1], from}
+							outboundFailedReport[Key{outboundToDate, from}]++
+							outboundFailedMap[outboundToId] = Key{outboundToDate, from}
+						}
+
+						if cliOptions.Verbose {
+							fmt.Fprintf(os.Stderr, "%s %s outbound failure %s -> %s\n", outboundToDate, outboundToTime, from, outboundToTo)
 						}
 					}
 				} else {
@@ -196,9 +217,17 @@ func main() {
 			//
 			inboundToMatches := inboundToRegex.FindStringSubmatch(scanner.Text())
 			if len(inboundToMatches) > 0 {
+
+				// date $1, time $2, id $3, to $4, status $5
+				inboundToDate := inboundToMatches[1]
+				inboundToTime := inboundToMatches[2]
+				inboundToId := inboundToMatches[3]
+				inboundToTo := inboundToMatches[4]
+				//inboundToStatus := inboundToMatches[5]
+
 				// Skip if outside time range
 				//
-				timestamp, err := time.Parse(time.DateOnly, inboundToMatches[1])
+				timestamp, err := time.Parse(time.DateOnly, inboundToDate)
 				if err != nil {
 					panic(fmt.Sprintf("could not parse timestamp: %v", err))
 				}
@@ -207,13 +236,17 @@ func main() {
 				}
 				// Only process if we found a previous from address for this id
 				//
-				_, ok := outboundFromMap[inboundToMatches[2]]
+				from, ok := outboundFromMap[inboundToId]
 				if ok {
 					// successful inbound
 					//
 					// Record success
 					//
-					inboundSentReport[Key{inboundToMatches[1], inboundToMatches[3]}]++
+					inboundSentReport[Key{inboundToDate, inboundToTo}]++
+
+					if cliOptions.Verbose {
+						fmt.Fprintf(os.Stderr, "%s %s inbound success %s -> %s\n", inboundToDate, inboundToTime, from, inboundToTo)
+					}
 				} else {
 					fmt.Fprintf(os.Stderr, "No match for %s\n", scanner.Text())
 				}
@@ -224,9 +257,17 @@ func main() {
 			//
 			inboundRejectMatches := inboundRejectRegex.FindStringSubmatch(scanner.Text())
 			if len(inboundRejectMatches) > 0 {
+
+				// date $1, time $2, id $3, from $4, to $5
+				inboundRejectDate := inboundRejectMatches[1]
+				inboundRejectTime := inboundRejectMatches[2]
+				inboundRejectId := inboundRejectMatches[3]
+				inboundRejectFrom := inboundRejectMatches[4]
+				inboundRejectTo := inboundRejectMatches[5]
+
 				// Skip if outside time range
 				//
-				timestamp, err := time.Parse(time.DateOnly, inboundRejectMatches[1])
+				timestamp, err := time.Parse(time.DateOnly, inboundRejectDate)
 				if err != nil {
 					panic(fmt.Sprintf("could not parse timestamp: %v", err))
 				}
@@ -235,15 +276,18 @@ func main() {
 				}
 				// Record failure, but make sure we don't record retries as multiple failures
 				//
-				_, ok := inboundFailedMap[inboundRejectMatches[2]]
+				_, ok := inboundFailedMap[inboundRejectId]
 				if !ok {
 					// rejected inbound
 					//
-					//fmt.Fprintf(os.Stderr, "Inbound message rejected %s %s %s->%s\n", inboundRejectMatches[1], inboundRejectMatches[2], inboundRejectMatches[3], inboundRejectMatches[4])
 					// Record success
 					//
-					inboundFailedReport[Key{inboundRejectMatches[1], inboundRejectMatches[4]}]++
-					inboundFailedMap[inboundRejectMatches[2]] = Key{inboundRejectMatches[1], inboundRejectMatches[4]}
+					inboundFailedReport[Key{inboundRejectDate, inboundRejectTo}]++
+					inboundFailedMap[inboundRejectId] = Key{inboundRejectDate, inboundRejectTo}
+
+					if cliOptions.Verbose {
+						fmt.Fprintf(os.Stderr, "%s %s inbound reject %s -> %s\n", inboundRejectDate, inboundRejectTime, inboundRejectFrom, inboundRejectTo)
+					}
 				}
 				continue
 			}
@@ -251,8 +295,13 @@ func main() {
 			// Record that an email has been re-queued (has a new id)
 			//
 			requeueMatches := requeueRegex.FindStringSubmatch(scanner.Text())
+
 			if len(requeueMatches) > 0 {
-				outboundRequeueMap[requeueMatches[3]] = requeueMatches[2]
+				// date $1, time $2, id $3, original id $4
+				outboundRequeueId := requeueMatches[3]
+				outboundRequeueOrigId := requeueMatches[4]
+
+				outboundRequeueMap[outboundRequeueOrigId] = outboundRequeueId
 				continue
 			}
 		}
